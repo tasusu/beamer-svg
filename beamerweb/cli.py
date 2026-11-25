@@ -1,0 +1,233 @@
+"""Build a PDF or a local, self-contained directory of SVG slide assets."""
+
+import argparse
+from functools import partial
+from html import escape
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+from tempfile import TemporaryDirectory
+from xml.dom import minidom
+from xml.parsers.expat import ExpatError
+
+ROOT = Path(__file__).resolve().parent
+SVG_NS = "http://www.w3.org/2000/svg"
+XLINK_NS = "http://www.w3.org/1999/xlink"
+FRAME_RANGE = re.compile(r"\\beamer@framepages\s*\{(\d+)\}\{(\d+)\}")
+URL_REF = re.compile(r"url\(\s*(['\"]?)#([^\s)'\"]+)\1\s*\)")
+
+
+def run(command, cwd, env=None):
+    result = subprocess.run(
+        command, cwd=cwd, env=env, stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT, text=True, errors="replace", check=False,
+    )
+    if result.returncode:
+        raise RuntimeError(f"{command[0]} exited with {result.returncode}\n{result.stdout}")
+    return result.stdout
+
+
+def compile_tex(source, work, engine, web, pgf_driver="dvisvgm"):
+    env = os.environ.copy()
+    env["TEXINPUTS"] = os.pathsep.join((str(ROOT / "tex"), env.get("TEXINPUTS", ""), ""))
+    entry = "./" + source.name
+    if web:
+        if any(character in source.name for character in "%{}\\"):
+            raise ValueError("The TeX filename cannot contain %, braces, or backslashes.")
+        entry = (
+            r"\def\BeamerWebBuild{1}"
+            r"\PassOptionsToPackage{dvisvgm}{graphicx,xcolor,hyperref}"
+            rf"\def\pgfsysdriver{{pgfsys-{pgf_driver}.def}}"
+            r"\AddToHook{begindocument/before}{\RequirePackage{beamerweb}}"
+            r"\input{\detokenize{" + source.name + "}}"
+        )
+
+    engine_args = ["-no-pdf"] if web and engine == "xelatex" else []
+    command = [
+        engine, *engine_args, "-no-shell-escape", "-halt-on-error",
+        "-interaction=nonstopmode", "-file-line-error", "-jobname=deck",
+        f"-output-directory={work}", entry,
+    ]
+    for _ in range(2):
+        run(command, source.parent, env)
+
+
+def page_metadata(work, count):
+    nav = work / "deck.nav"
+    frames = FRAME_RANGE.findall(nav.read_text(errors="replace")) if nav.exists() else []
+    title_file = work / "deck.bwtitles"
+    titles = title_file.read_text(errors="replace").splitlines() if title_file.exists() else []
+    ranges = {}
+    for index, (first, last) in enumerate(frames, start=1):
+        start, end = int(first), int(last)
+        for page in range(start, min(end, count) + 1):
+            ranges[page] = (index, page - start + 1)
+    if len(ranges) != count:
+        print("Warning: Beamer navigation does not describe every physical page.", file=sys.stderr)
+    return [
+        {
+            "physicalPage": page,
+            "frame": ranges.get(page, (None, None))[0],
+            "overlay": ranges.get(page, (None, None))[1],
+            "frameTitle": titles[page - 1] if page <= len(titles) else "",
+        }
+        for page in range(1, count + 1)
+    ]
+
+
+def inline_svg(path, page):
+    doc = minidom.parseString(path.read_bytes())
+    root = doc.documentElement
+    if doc.doctype or root.namespaceURI != SVG_NS or root.localName != "svg":
+        raise ValueError(f"{path.name}: expected an SVG document without a DOCTYPE")
+    if not root.getAttribute("viewBox"):
+        raise ValueError(f"{path.name}: missing SVG viewBox")
+    elements = [root, *root.getElementsByTagName("*")]
+    ids = {}
+    for node in elements:
+        if node.hasAttribute("id"):
+            original = node.getAttribute("id")
+            if original in ids:
+                raise ValueError(f"{path.name}: duplicate SVG id {original!r}")
+            ids[original] = f"bw{page}-{original}"
+            node.setAttribute("id", ids[original])
+
+    for node in elements:
+        for attr in list(node.attributes.values()):
+            value = attr.value
+            if attr.localName == "href" and attr.namespaceURI in (None, XLINK_NS):
+                if value.startswith("#") and value[1:] in ids:
+                    attr.value = "#" + ids[value[1:]]
+            elif "url(" in value:
+                attr.value = URL_REF.sub(
+                    lambda match: f"url(#{ids[match[2]]})" if match[2] in ids else match[0], value
+                )
+    root.setAttribute("preserveAspectRatio", "xMidYMid meet")
+    return root.toxml()
+
+
+def make_html(source, work, pages, placement, production):
+    meta = page_metadata(work, len(pages))
+    slides = []
+    for page, path in enumerate(pages, 1):
+        svg = inline_svg(path, page)
+        hidden = "" if page == 1 else " hidden"
+        slides.append(
+            f'<section class="bw-slide" aria-label="ページ {page}"{hidden}>'
+            f'{svg}<div class="bw-widget-layer"></div></section>'
+        )
+    payload = json.dumps(meta, ensure_ascii=True).replace("<", "\\u003c")
+    title = escape(source.stem)
+    return f"""<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{title}</title>
+<link rel="stylesheet" href="runtime.css">
+<link rel="stylesheet" href="deck.css">
+</head>
+<body>
+<main id="bw-deck" data-placement="{placement}" data-production="{str(production).lower()}">
+{''.join(slides)}
+</main>
+<nav class="bw-controls" aria-label="スライド操作">
+<button type="button" id="bw-prev" aria-label="前へ">←</button>
+<output id="bw-counter" aria-live="polite"></output>
+<button type="button" id="bw-next" aria-label="次へ">→</button>
+<button type="button" id="bw-fullscreen" aria-label="全画面">⛶</button>
+</nav>
+<script id="bw-metadata" type="application/json">{payload}</script>
+<script defer src="runtime.js"></script>
+<script defer src="deck.js"></script>
+</body>
+</html>
+"""
+
+
+def build(args):
+    source = args.source.resolve(strict=True)
+    web = args.action != "pdf"
+    engine = args.engine or ("latex" if web else "pdflatex")
+    with TemporaryDirectory(prefix="beamerweb-") as temp:
+        work = Path(temp)
+        compile_tex(source, work, engine, web)
+        if not web:
+            output = args.output or source.with_suffix(".pdf")
+            output.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(work / "deck.pdf", output)
+            return output
+        suffix = "xdv" if engine == "xelatex" else "dvi"
+        converter = os.environ.get("DVISVGM", "dvisvgm")
+        conversion_command = [
+            converter, "--page=1-", "--bbox=papersize", "--no-fonts", "--embed-bitmaps",
+            f"--output={work / 'slide-%p.svg'}", str(work / f"deck.{suffix}"),
+        ]
+        try:
+            conversion = run(conversion_command, source.parent)
+        except RuntimeError as error:
+            if engine == "xelatex" or "XML error: missing closing tag(s)" not in str(error):
+                raise
+            print("Retrying with the PGF dvips driver after an unclosed SVG group.", file=sys.stderr)
+            for page in work.glob("slide-*.svg"):
+                page.unlink()
+            compile_tex(source, work, engine, web=True, pgf_driver="dvips")
+            conversion = run(conversion_command, source.parent)
+        pages = sorted(work.glob("slide-*.svg"), key=lambda path: int(path.stem.split("-")[1]))
+        if not pages:
+            raise RuntimeError(f"dvisvgm produced no SVG pages\n{conversion}")
+        if re.search(r"(?im)^.*(?:error|warning):", conversion):
+            print(conversion, file=sys.stderr)
+        document = make_html(source, work, pages, args.placement, args.production)
+        output = args.output or Path("dist")
+        output.mkdir(parents=True, exist_ok=True)
+        for name in ("runtime.js", "runtime.css"):
+            shutil.copyfile(ROOT / "runtime" / name, output / name)
+        for ext, asset in (("js", args.js), ("css", args.css)):
+            target = output / f"deck.{ext}"
+            sidecar = asset or source.with_suffix(f".{ext}")
+            if sidecar.is_file() or asset:
+                if sidecar.resolve() != target.resolve():
+                    shutil.copyfile(sidecar, target)
+            else:
+                target.write_text("", encoding="utf-8")
+        (output / "index.html").write_text(document, encoding="utf-8")
+        return output
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(prog="beamerweb")
+    commands = parser.add_subparsers(dest="action", required=True)
+    for action in ("pdf", "build", "serve"):
+        command = commands.add_parser(action)
+        command.add_argument("source", type=Path)
+        command.add_argument("-o", "--output", type=Path)
+        engines = ("pdflatex", "lualatex", "xelatex") if action == "pdf" else ("latex", "dvilualatex", "xelatex")
+        command.add_argument("--engine", choices=engines)
+        if action != "pdf":
+            command.add_argument("--placement", choices=("overlay", "foreign-object"), default="overlay")
+            command.add_argument("--js", type=Path)
+            command.add_argument("--css", type=Path)
+            command.add_argument("--production", action="store_true")
+        if action == "serve":
+            command.add_argument("--port", type=int, default=8000)
+    args = parser.parse_args(argv)
+    try:
+        output = build(args)
+        print(output.resolve(), flush=True)
+        if args.action == "serve":
+            handler = partial(SimpleHTTPRequestHandler, directory=output)
+            with ThreadingHTTPServer(("127.0.0.1", args.port), handler) as server:
+                print(f"http://127.0.0.1:{server.server_port}", flush=True)
+                server.serve_forever()
+    except KeyboardInterrupt:
+        return 130
+    except (OSError, RuntimeError, ValueError, ExpatError) as error:
+        print(error, file=sys.stderr)
+        return 1
+    return 0

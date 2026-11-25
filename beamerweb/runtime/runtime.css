@@ -1,0 +1,70 @@
+body {
+  margin: 0;
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  background: #15171c;
+  color: #f2f3f7;
+  font: 15px system-ui, sans-serif;
+}
+
+#bw-deck, .bw-slide {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.bw-slide > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.bw-widget-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.bw-widget {
+  box-sizing: border-box;
+  overflow: hidden;
+  pointer-events: auto;
+  color: #192033;
+  font: 12px system-ui, sans-serif;
+}
+
+.bw-widget-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+
+.bw-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px;
+}
+
+.bw-controls button {
+  border: 1px solid #737886;
+  border-radius: 5px;
+  padding: 4px 12px;
+  background: #282c36;
+  color: inherit;
+  font: inherit;
+}
+
+.bw-controls button:disabled {
+  opacity: .45;
+}
+
+#bw-counter {
+  text-align: center;
+  min-width: 5em;
+}

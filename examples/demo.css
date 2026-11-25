@@ -1,0 +1,22 @@
+.demo-widget {
+  display: block;
+  padding: 5px;
+}
+
+.demo-widget input[type=range] {
+  display: block;
+  width: 92%;
+  margin: 4px 0;
+}
+
+.demo-widget canvas {
+  display: block;
+  width: 230px;
+  height: 49px;
+  max-width: 100%;
+  background: #e8efff;
+  margin-bottom: 3px;
+}
+
+[data-web-id^="vertex-"] { cursor: pointer; }
+[data-web-id^="edge-"].highlight { opacity: .25; }

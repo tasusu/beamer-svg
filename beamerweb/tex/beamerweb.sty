@@ -1,0 +1,102 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesExplPackage{beamerweb}{2026/11/25}{0.1.0}{Interactive Beamer SVG}
+\bool_new:N \g_bw_web_bool
+\cs_if_exist:NT \BeamerWebBuild { \bool_gset_true:N \g_bw_web_bool }
+
+\cs_new_protected:Npn \bw_validate:n #1
+  {
+    \regex_match:nnF { \A [A-Za-z0-9] [-A-Za-z0-9_.:]* \Z } {#1}
+      { \PackageError{beamerweb}{Invalid~web~name:~\tl_to_str:n{#1}}
+        {Use~letters,~digits,~hyphens,~underscores,~dots~and~colons.} }
+  }
+\cs_new_protected:Npn \bw_open:n #1
+  {
+    \bool_if:NT \g_bw_web_bool
+      { \bw_validate:n {#1} \special{dvisvgm:raw~<g~data-web-id='#1'>} }
+  }
+\cs_new_protected:Npn \bw_close:
+  { \bool_if:NT \g_bw_web_bool { \special{dvisvgm:raw~</g>} } }
+\NewDocumentCommand \webid {m +m} { \bw_open:n {#1} #2 \bw_close: }
+\NewDocumentEnvironment {webinteractive} {m} { \bw_open:n {#1} } { \bw_close: }
+
+% PGF inserts both specials and drawing operations in the picture stream.
+\cs_new_protected:Npn \bw_tikz_setup:
+  {
+    \tikzset{web~id/.style={
+      execute~at~begin~scope={\bw_open:n {##1}},
+      execute~at~end~scope={\bw_close:}}}
+  }
+\AddToHook{package/tikz/after}{\bw_tikz_setup:}
+
+\dim_new:N \l_bw_width_dim
+\dim_new:N \l_bw_height_dim
+\box_new:N \l_bw_fallback_box
+\keys_define:nn {beamerweb/widget}
+  {
+    width .dim_set:N = \l_bw_width_dim,
+    height .dim_set:N = \l_bw_height_dim,
+    fallback .code:n = {\bool_if:NF \g_bw_web_bool {\hbox_set:Nn \l_bw_fallback_box {#1}}}
+  }
+\NewDocumentCommand \webwidget {O{} m}
+  {
+    \group_begin:
+    \dim_set:Nn \l_bw_width_dim {7cm}
+    \dim_set:Nn \l_bw_height_dim {1cm}
+    \keys_set:nn {beamerweb/widget} {#1}
+    \dim_compare:nNnF {\l_bw_width_dim} > {0pt}
+      {\PackageError{beamerweb}{Widget~width~must~be~positive}{}}
+    \dim_compare:nNnF {\l_bw_height_dim} > {0pt}
+      {\PackageError{beamerweb}{Widget~height~must~be~positive}{}}
+    \leavevmode
+    \hbox_to_wd:nn {\l_bw_width_dim}
+      {
+        \vrule width~0pt~height~\l_bw_height_dim~depth~0pt~
+        \bool_if:NTF \g_bw_web_bool
+          {
+            \bw_validate:n {#2}
+            \special{dvisvgm:raw~<rect~data-web-widget='#2'~
+              x='{?x}'~y='{?(y-\dim_to_decimal_in_bp:n{\l_bw_height_dim})}'~
+              width='\dim_to_decimal_in_bp:n{\l_bw_width_dim}'~
+              height='\dim_to_decimal_in_bp:n{\l_bw_height_dim}'~
+              transform='{?matrix}'~fill='none'~pointer-events='none'/>}
+          }
+          {
+            \box_set_ht:Nn \l_bw_fallback_box {0pt}
+            \box_set_dp:Nn \l_bw_fallback_box {0pt}
+            \hbox_overlap_right:n { \box_use:N \l_bw_fallback_box }
+          }
+        \hss
+      }
+    \group_end:
+  }
+
+\bool_if:NT \g_bw_web_bool
+  {
+    \str_if_eq:eeTF { \pgfsysdriver } { pgfsys-dvips.def }
+      {
+        % Keep TeX glyphs and raw widget markers in the same hidden SVG group.
+        \cs_set_protected:Npn \pgfsys@begininvisible
+          {\special{dvisvgm:raw~<g~visibility='hidden'>}}
+        \cs_set_protected:Npn \pgfsys@endinvisible
+          {\special{dvisvgm:raw~</g>}}
+      }
+      {
+        % Beamer color boxes reset fill opacity outside a PGF scope.
+        % The SVG driver opens a group for that reset and cannot close it there.
+        \cs_new_eq:NN \bw_original_fill_opacity:n \pgfsetfillopacity
+        \RenewDocumentCommand \pgfsetfillopacity {m}
+          {
+            \ifpgfpicture
+              \bw_original_fill_opacity:n {#1}
+            \else
+              \fp_compare:nNnF {#1} = {1}
+                {\bw_original_fill_opacity:n {#1}}
+            \fi
+          }
+      }
+    \iow_new:N \g_bw_title_iow
+    \iow_open:Nn \g_bw_title_iow {\jobname.bwtitles}
+    \cs_generate_variant:Nn \tl_to_str:n {o}
+    \AddToHook{shipout/before}
+      { \iow_now:Nx \g_bw_title_iow {\tl_to_str:o {\beamer@frametitle}} }
+  }

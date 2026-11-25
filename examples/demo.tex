@@ -1,0 +1,40 @@
+\documentclass[aspectratio=169]{beamer}
+\usetheme{Madrid}
+\setbeamertemplate{blocks}[default]
+\usepackage{tikz}
+\usepackage{beamerweb}
+
+\begin{document}
+\begin{frame}{HTML slider}
+  \begin{block}{A Beamer block}
+    \webid{formula}{$\displaystyle f(\lambda)=1-e^{-\lambda}$}
+  \end{block}
+  \webwidget[width=8cm,height=2cm,fallback={\texttt{Static value:} $\lambda=0.43$}]{slider-demo}
+  \pause
+
+  \only<2->{Move the slider to change the formula opacity.}
+\end{frame}
+
+\begin{frame}{TikZ network}
+  \centering
+  \begin{webinteractive}{flow-graph}
+    \begin{tikzpicture}[x=1.7cm,y=1.3cm,thick]
+      \begin{scope}[web id=edge-sv] \draw[->] (.22,0.10) -- (1.78,.90); \end{scope}
+      \begin{scope}[web id=edge-sw] \draw[->] (.22,-.10) -- (1.78,-.90); \end{scope}
+      \begin{scope}[web id=edge-vt] \draw[->] (2.22,.90) -- (3.78,.10); \end{scope}
+      \begin{scope}[web id=edge-wt] \draw[->] (2.22,-.90) -- (3.78,-.10); \end{scope}
+      \begin{scope}[web id=vertex-s] \node[draw,circle,fill=blue!12] at (0,0) {$s$}; \end{scope}
+      \begin{scope}[web id=vertex-v] \node[draw,circle,fill=blue!12] at (2,1) {$v$}; \end{scope}
+      \begin{scope}[web id=vertex-w] \node[draw,circle,fill=blue!12] at (2,-1) {$w$}; \end{scope}
+      \begin{scope}[web id=vertex-t] \node[draw,circle,fill=blue!12] at (4,0) {$t$}; \end{scope}
+    \end{tikzpicture}
+  \end{webinteractive}
+
+  \webwidget[width=8cm,height=0.8cm,fallback={Select a vertex in the web deck.}]{network-selection}
+\end{frame}
+
+\begin{frame}{Canvas animation}
+  \centering
+  \webwidget[width=9cm,height=3.2cm,fallback={Canvas motion demo (web edition).}]{canvas-demo}
+\end{frame}
+\end{document}
