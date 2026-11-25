@@ -14,7 +14,7 @@ Web ビルドは TeX の文書開始フックでパッケージを読み込み�
 
 `--bbox=papersize` で空白を含む用紙全体を保ちます。marker は物理的に確保済みの矩形なので、描画内容に基づく `dvisvgm:bbox` や `{?bbox name}` に依存しません。定義領域への挿入に使う `rawdef` は、ウィジェットや scene graph のグループを描画位置で生成する今回の用途では不要です。
 
-Python の XML パーサーで SVG の名前空間と `viewBox` を検証し、ID とローカルの `href`・属性中の `url(#id)` にページごとの接頭辞を付けます。これにより、同じグリフ ID が別のページにもある場合に参照が衝突しません。ユーザーが付けた `data-web-id` は API として保持されます。画像には dvisvgm の `--embed-bitmaps` を適用します。
+Python の XML パーサーで SVG の名前空間と `viewBox` を検証し、ID とローカルの `href`・属性中の `url(#id)` にページごとの接頭辞を付けます。これにより、同じグリフ ID が別のページにもある場合に参照が衝突しません。ユーザーが付けた `data-web-id` は API として保持されます。対応する dvisvgm には画像の `--embed-bitmaps` を渡します。TeX Live 2022 最終版に同梱の dvisvgm 2.13.3 ではこのオプションを省略します。
 
 ## SVG 座標から HTML 座標へ
 
@@ -36,7 +36,7 @@ SVG は `preserveAspectRatio="xMidYMid meet"` で表示し、余白を付けて�
 
 ## 対応範囲
 
-- 動作確認済みの既定構成は LaTeX DVI と dvisvgm 3.4.4 です。Beamer 3.72 と PGF の SVG ドライバでは、一部の丸角ブロックで SVG グループの不整合を再現し、DVI の再試行で Madrid の丸角ブロックを変換できることを確認しました。デモは XeLaTeX でも比較できるよう通常のブロックテンプレートを指定しています。明示的な背景透過、PDF 画像や PDF 固有の special は使用する TeX エンジンと dvisvgm で確認してください。
+- LaTeX DVI は、TeX Live 2022 最終版の dvisvgm 2.13.3 と、dvisvgm 3.4.4 の両方で検証しています。Beamer 3.72 と PGF の SVG ドライバでは、一部の丸角ブロックで SVG グループの不整合を再現し、DVI の再試行で Madrid の丸角ブロックを変換できることを確認しました。デモは XeLaTeX でも比較できるよう通常のブロックテンプレートを指定しています。明示的な背景透過、PDF 画像や PDF 固有の special は使用する TeX エンジンと dvisvgm で確認してください。
 - build は LaTeX を 2 回実行します。複雑な文献処理などの追加ツール、SVG 埋め込みスタイルに含まれる独自の ID セレクター、他ページを指す Beamer のリンクの変換、watch は今後の拡張です。
 - ソースと sidecar JavaScript は信頼できるものを利用してください。TeX には `-no-shell-escape` を渡し、ウィジェット名は明示的なレジストリで解決します。変換済み SVG と JavaScript を含む出力は作者のコードとして実行されます。
 - `dist/` には core runtime とデモに必要なファイルが含まれます。作者の JavaScript や CSS が追加アセットを参照する場合は、そのファイルも配布してください。

@@ -18,6 +18,7 @@ from xml.parsers.expat import ExpatError
 ROOT = Path(__file__).resolve().parent
 SVG_NS = "http://www.w3.org/2000/svg"
 XLINK_NS = "http://www.w3.org/1999/xlink"
+UNCLOSED_GROUP = "missing closing tag(s)"
 FRAME_RANGE = re.compile(r"\\beamer@framepages\s*\{(\d+)\}\{(\d+)\}")
 URL_REF = re.compile(r"url\(\s*(['\"]?)#([^\s)'\"]+)\1\s*\)")
 
@@ -163,21 +164,34 @@ def build(args):
             shutil.copyfile(work / "deck.pdf", output)
             return output
         suffix = "xdv" if engine == "xelatex" else "dvi"
-        converter = os.environ.get("DVISVGM", "dvisvgm")
+        converter = args.dvisvgm.expanduser().absolute() if args.dvisvgm else os.environ.get("DVISVGM", "dvisvgm")
         conversion_command = [
-            converter, "--page=1-", "--bbox=papersize", "--no-fonts", "--embed-bitmaps",
+            converter, "--page=1-", "--bbox=papersize", "--no-fonts",
             f"--output={work / 'slide-%p.svg'}", str(work / f"deck.{suffix}"),
         ]
+        if "--embed-bitmaps" in run([converter, "--help"], source.parent):
+            conversion_command.insert(1, "--embed-bitmaps")
         try:
             conversion = run(conversion_command, source.parent)
         except RuntimeError as error:
-            if engine == "xelatex" or "XML error: missing closing tag(s)" not in str(error):
+            if UNCLOSED_GROUP not in str(error):
                 raise
+            conversion = str(error)
+
+        # Older dvisvgm versions report this error with a successful exit status.
+        if UNCLOSED_GROUP in conversion:
+            if engine == "xelatex":
+                raise RuntimeError(conversion)
             print("Retrying with the PGF dvips driver after an unclosed SVG group.", file=sys.stderr)
             for page in work.glob("slide-*.svg"):
                 page.unlink()
             compile_tex(source, work, engine, web=True, pgf_driver="dvips")
             conversion = run(conversion_command, source.parent)
+            if UNCLOSED_GROUP in conversion:
+                raise RuntimeError(conversion)
+            if "PostScript specials ignored" in conversion:
+                raise RuntimeError("The PGF dvips retry needs Ghostscript. Set LIBGS to its shared library.\n"
+                                   + conversion)
         pages = sorted(work.glob("slide-*.svg"), key=lambda path: int(path.stem.split("-")[1]))
         if not pages:
             raise RuntimeError(f"dvisvgm produced no SVG pages\n{conversion}")
@@ -210,6 +224,8 @@ def main(argv=None):
         engines = ("pdflatex", "lualatex", "xelatex") if action == "pdf" else ("latex", "dvilualatex", "xelatex")
         command.add_argument("--engine", choices=engines)
         if action != "pdf":
+            command.add_argument("--dvisvgm", type=Path, metavar="PATH",
+                                 help="path to dvisvgm, overriding DVISVGM and PATH lookup")
             command.add_argument("--placement", choices=("overlay", "foreign-object"), default="overlay")
             command.add_argument("--js", type=Path)
             command.add_argument("--css", type=Path)

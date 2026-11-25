@@ -1,10 +1,12 @@
 import json
+import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 from xml.dom import minidom
 
 from beamerweb.cli import inline_svg, main
@@ -87,7 +89,12 @@ class BuildTests(unittest.TestCase):
 \end{frame}
 \end{document}
 """)
-            self.assertEqual(main(["build", str(source), "-o", str(root / "dist")]), 0)
+            converter = shutil.which(os.environ.get("DVISVGM", "dvisvgm"))
+            self.assertIsNotNone(converter, "dvisvgm is required for this test")
+            relative_converter = os.path.relpath(converter)
+            with patch.dict(os.environ, {"DVISVGM": str(root / "missing-dvisvgm")}):
+                args = ["build", str(source), "--dvisvgm", relative_converter, "-o", str(root / "dist")]
+                self.assertEqual(main(args), 0)
             html = (root / "dist" / "index.html").read_text()
             self.assertIn('visibility="hidden"', html)
             self.assertEqual(html.count('data-web-widget="later"'), 2)

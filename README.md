@@ -4,7 +4,7 @@ Beamer が組版した全ページを dvisvgm で SVG に変換し、各ペー�
 
 ## セットアップとデモ
 
-Python 3.10 以上、TeX Live の LaTeX・Beamer・PGF/TikZ、dvisvgm 3.x が必要です。Debian 系では以下のパッケージが揃えばデモをビルドできます。
+Python 3.10 以上、TeX Live 2022 最終版以降の LaTeX・Beamer・PGF/TikZ、dvisvgm 2.13.3 以降が必要です。Debian 系では以下のパッケージが揃えばデモをビルドできます。
 
 ```sh
 sudo apt-get install texlive-latex-recommended texlive-pictures texlive-fonts-recommended dvisvgm ghostscript
@@ -18,7 +18,13 @@ beamerweb serve examples/demo.tex
 
 `dist/index.html` をブラウザで開けます。デモはスライダーで数式の透明度を変え、TikZ の頂点クリックで辺を強調し、Canvas アニメーションを再生・停止します。`examples/demo.pdf` には各ウィジェットの静的な表示が入ります。
 
-`serve` はビルド後に loopback の HTTP サーバーを起動します。既定はポート 8000 で、`--port` で変更できます。パッケージをインストールせずにリポジトリから実行する場合は、各コマンドの `beamerweb` を `python3 -m beamerweb` に置き換えられます。dvisvgm の実行ファイルは `DVISVGM` で指定できます。
+`serve` はビルド後に loopback の HTTP サーバーを起動します。既定はポート 8000 で、`--port` で変更できます。パッケージをインストールせずにリポジトリから実行する場合は、各コマンドの `beamerweb` を `python3 -m beamerweb` に置き換えられます。`build` と `serve` は `--dvisvgm PATH` で使用する実行ファイルを指定できます。相対パスはコマンドを実行したディレクトリを基準にします。指定を省略した場合は `DVISVGM`、それも未設定の場合は `PATH` 上の `dvisvgm` を使います。
+
+```sh
+beamerweb build examples/demo.tex --dvisvgm /path/to/texlive/bin/dvisvgm
+```
+
+dvisvgm が Ghostscript を見つけられない場合は、`LIBGS` に Ghostscript の共有ライブラリのパスを設定してください。たとえば Debian の x86-64 環境では `export LIBGS=/usr/lib/x86_64-linux-gnu/libgs.so.10` です。
 
 | 操作 | キー |
 | --- | --- |
