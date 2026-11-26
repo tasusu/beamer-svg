@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ title }}</title>
+<link rel="stylesheet" href="runtime.css">
+<link rel="stylesheet" href="deck.css">
+</head>
+<body>
+<main id="bw-deck" data-placement="{{ placement }}" data-production="{{ production | lower }}">
+{% for svg in slides %}
+  <section class="bw-slide" aria-label="ページ {{ loop.index }}"{% if not loop.first %} hidden{% endif %}>
+    {{ svg | safe }}<div class="bw-widget-layer"></div>
+  </section>
+{% endfor %}
+</main>
+<nav class="bw-controls" aria-label="スライド操作">
+<button type="button" id="bw-prev" aria-label="前へ">←</button>
+<output id="bw-counter" aria-live="polite"></output>
+<button type="button" id="bw-next" aria-label="次へ">→</button>
+<button type="button" id="bw-fullscreen" aria-label="全画面">⛶</button>
+</nav>
+<script id="bw-metadata" type="application/json">{{ metadata | tojson }}</script>
+<script defer src="runtime.js"></script>
+<script defer src="deck.js"></script>
+</body>
+</html>

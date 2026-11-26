@@ -16,7 +16,7 @@ beamerweb pdf examples/demo.tex
 beamerweb serve examples/demo.tex
 ```
 
-`dist/index.html` をブラウザで開けます。デモはスライダーで数式の透明度を変え、TikZ の頂点クリックで辺を強調し、Canvas アニメーションを再生・停止します。`examples/demo.pdf` には各ウィジェットの静的な表示が入ります。
+`_build/html/index.html` をブラウザで開けます。デモはスライダーで数式の透明度を変え、TikZ の頂点クリックで辺を強調し、Canvas アニメーションを再生・停止します。`_build/pdf/demo.pdf` には各ウィジェットの静的な表示が入ります。
 
 `serve` はビルド後に loopback の HTTP サーバーを起動します。既定はポート 8000 で、`--port` で変更できます。パッケージをインストールせずにリポジトリから実行する場合は、各コマンドの `beamerweb` を `python3 -m beamerweb` に置き換えられます。`build` と `serve` は `--dvisvgm PATH` で使用する実行ファイルを指定できます。相対パスはコマンドを実行したディレクトリを基準にします。指定を省略した場合は `DVISVGM`、それも未設定の場合は `PATH` 上の `dvisvgm` を使います。
 
@@ -34,6 +34,20 @@ dvisvgm が Ghostscript を見つけられない場合は、`LIBGS` に Ghostscr
 | 全画面 | F |
 
 `#/3` は物理ページ 3 へのリンクです。再読み込みとブラウザの戻る・進むでそのページを復元できます。
+
+## ビルド出力と HTML テンプレート
+
+コマンドを実行したディレクトリの `_build/` に出力します。
+
+| パス | 内容 |
+| --- | --- |
+| `_build/html/` | HTML、JavaScript、CSS。 `serve` の配信ルート |
+| `_build/pdf/` | 完成した PDF |
+| `_build/intermediate/` | TeX のログ・補助ファイル、DVI/XDV、中間 SVG |
+
+`-o` に相対パスを渡すと `_build/` を基準にします（例 `beamerweb build examples/demo.tex -o preview`）。`_build/` から始まる相対パスや、その配下の絶対パスも指定できます。
+
+配布パッケージの [Jinja2 テンプレート](beamerweb/templates/index.html.j2) をカレントディレクトリの `_templates/index.html.j2` にコピーすると、プロジェクト単位で HTML を変更できます。テンプレートには `title`、`slides`（SVG の配列）、`metadata`、`placement`、`production` が渡されます。既存ランタイムを使う場合は、デッキやスライドの ID・クラスとスクリプト参照を維持してください。
 
 ## TeX と JavaScript の API
 

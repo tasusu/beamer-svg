@@ -2,18 +2,18 @@
 
 import argparse
 from functools import partial
-from html import escape
+from hashlib import sha256
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-import json
 import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
-from tempfile import TemporaryDirectory
 from xml.dom import minidom
 from xml.parsers.expat import ExpatError
+
+from jinja2 import Environment, FileSystemLoader, TemplateError
 
 ROOT = Path(__file__).resolve().parent
 SVG_NS = "http://www.w3.org/2000/svg"
@@ -34,7 +34,7 @@ def run(command, cwd, env=None):
 
 
 def compile_tex(source, work, engine, web, pgf_driver="dvisvgm"):
-    env = os.environ.copy()
+    env = dict(os.environ, TMPDIR=str(work), TMP=str(work), TEMP=str(work))
     env["TEXINPUTS"] = os.pathsep.join((str(ROOT / "tex"), env.get("TEXINPUTS", ""), ""))
     entry = "./" + source.name
     if web:
@@ -113,105 +113,93 @@ def inline_svg(path, page):
 
 
 def make_html(source, work, pages, placement, production):
-    meta = page_metadata(work, len(pages))
-    slides = []
-    for page, path in enumerate(pages, 1):
-        svg = inline_svg(path, page)
-        hidden = "" if page == 1 else " hidden"
-        slides.append(
-            f'<section class="bw-slide" aria-label="ページ {page}"{hidden}>'
-            f'{svg}<div class="bw-widget-layer"></div></section>'
-        )
-    payload = json.dumps(meta, ensure_ascii=True).replace("<", "\\u003c")
-    title = escape(source.stem)
-    return f"""<!doctype html>
-<html lang="ja">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{title}</title>
-<link rel="stylesheet" href="runtime.css">
-<link rel="stylesheet" href="deck.css">
-</head>
-<body>
-<main id="bw-deck" data-placement="{placement}" data-production="{str(production).lower()}">
-{''.join(slides)}
-</main>
-<nav class="bw-controls" aria-label="スライド操作">
-<button type="button" id="bw-prev" aria-label="前へ">←</button>
-<output id="bw-counter" aria-live="polite"></output>
-<button type="button" id="bw-next" aria-label="次へ">→</button>
-<button type="button" id="bw-fullscreen" aria-label="全画面">⛶</button>
-</nav>
-<script id="bw-metadata" type="application/json">{payload}</script>
-<script defer src="runtime.js"></script>
-<script defer src="deck.js"></script>
-</body>
-</html>
-"""
+    templates = Environment(
+        loader=FileSystemLoader([Path.cwd() / "_templates", ROOT / "templates"]),
+        autoescape=True,
+    )
+    return templates.get_template("index.html.j2").render(
+        title=source.stem,
+        slides=[inline_svg(path, page) for page, path in enumerate(pages, 1)],
+        metadata=page_metadata(work, len(pages)),
+        placement=placement,
+        production=production,
+    )
 
 
 def build(args):
     source = args.source.resolve(strict=True)
     web = args.action != "pdf"
     engine = args.engine or ("latex" if web else "pdflatex")
-    with TemporaryDirectory(prefix="beamerweb-") as temp:
-        work = Path(temp)
-        compile_tex(source, work, engine, web)
-        if not web:
-            output = args.output or source.with_suffix(".pdf")
-            output.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(work / "deck.pdf", output)
-            return output
-        suffix = "xdv" if engine == "xelatex" else "dvi"
-        converter = args.dvisvgm.expanduser().absolute() if args.dvisvgm else os.environ.get("DVISVGM", "dvisvgm")
-        conversion_command = [
-            converter, "--page=1-", "--bbox=papersize", "--no-fonts",
-            f"--output={work / 'slide-%p.svg'}", str(work / f"deck.{suffix}"),
-        ]
-        if "--embed-bitmaps" in run([converter, "--help"], source.parent):
-            conversion_command.insert(1, "--embed-bitmaps")
-        try:
-            conversion = run(conversion_command, source.parent)
-        except RuntimeError as error:
-            if UNCLOSED_GROUP not in str(error):
-                raise
-            conversion = str(error)
+    root = (Path.cwd() / "_build").resolve()
+    output = args.output or (Path("html") if web else Path("pdf") / source.with_suffix(".pdf").name)
+    if not output.is_absolute() and output.parts[:1] != ("_build",):
+        output = root / output
+    output = output.resolve()
+    intermediates = root / "intermediate"
+    if output == root or not output.is_relative_to(root) or output.is_relative_to(intermediates):
+        raise ValueError("Output must be under _build and outside _build/intermediate.")
 
-        # Older dvisvgm versions report this error with a successful exit status.
-        if UNCLOSED_GROUP in conversion:
-            if engine == "xelatex":
-                raise RuntimeError(conversion)
-            print("Retrying with the PGF dvips driver after an unclosed SVG group.", file=sys.stderr)
-            for page in work.glob("slide-*.svg"):
-                page.unlink()
-            compile_tex(source, work, engine, web=True, pgf_driver="dvips")
-            conversion = run(conversion_command, source.parent)
-            if UNCLOSED_GROUP in conversion:
-                raise RuntimeError(conversion)
-            if "PostScript specials ignored" in conversion:
-                raise RuntimeError("The PGF dvips retry needs Ghostscript. Set LIBGS to its shared library.\n"
-                                   + conversion)
-        pages = sorted(work.glob("slide-*.svg"), key=lambda path: int(path.stem.split("-")[1]))
-        if not pages:
-            raise RuntimeError(f"dvisvgm produced no SVG pages\n{conversion}")
-        if re.search(r"(?im)^.*(?:error|warning):", conversion):
-            print(conversion, file=sys.stderr)
-        document = make_html(source, work, pages, args.placement, args.production)
-        output = args.output or Path("dist")
-        output.mkdir(parents=True, exist_ok=True)
-        for name in ("runtime.js", "runtime.css"):
-            shutil.copyfile(ROOT / "runtime" / name, output / name)
-        for ext, asset in (("js", args.js), ("css", args.css)):
-            target = output / f"deck.{ext}"
-            sidecar = asset or source.with_suffix(f".{ext}")
-            if sidecar.is_file() or asset:
-                if sidecar.resolve() != target.resolve():
-                    shutil.copyfile(sidecar, target)
-            else:
-                target.write_text("", encoding="utf-8")
-        (output / "index.html").write_text(document, encoding="utf-8")
+    # Isolate TeX jobs for inputs with the same filename and for different engines.
+    job_key = sha256(os.fsencode(source)).hexdigest()[:16]
+    work = intermediates / ("web" if web else "pdf") / engine / f"{source.stem}-{job_key}"
+    work.mkdir(parents=True, exist_ok=True)
+    for pattern in ("deck.*", "slide-*.svg"):
+        for path in work.glob(pattern):
+            path.unlink()
+    compile_tex(source, work, engine, web)
+    if not web:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(work / "deck.pdf", output)
         return output
+    suffix = "xdv" if engine == "xelatex" else "dvi"
+    converter = args.dvisvgm.expanduser().absolute() if args.dvisvgm else os.environ.get("DVISVGM", "dvisvgm")
+    conversion_command = [
+        converter, "--page=1-", "--bbox=papersize", "--no-fonts",
+        f"--output={work / 'slide-%p.svg'}", str(work / f"deck.{suffix}"),
+    ]
+    env = dict(os.environ, TMPDIR=str(work), TMP=str(work), TEMP=str(work))
+    if "--embed-bitmaps" in run([converter, "--help"], source.parent, env):
+        conversion_command.insert(1, "--embed-bitmaps")
+    try:
+        conversion = run(conversion_command, source.parent, env)
+    except RuntimeError as error:
+        if UNCLOSED_GROUP not in str(error):
+            raise
+        conversion = str(error)
+
+    # Older dvisvgm versions report this error with a successful exit status.
+    if UNCLOSED_GROUP in conversion:
+        if engine == "xelatex":
+            raise RuntimeError(conversion)
+        print("Retrying with the PGF dvips driver after an unclosed SVG group.", file=sys.stderr)
+        for page in work.glob("slide-*.svg"):
+            page.unlink()
+        compile_tex(source, work, engine, web=True, pgf_driver="dvips")
+        conversion = run(conversion_command, source.parent, env)
+        if UNCLOSED_GROUP in conversion:
+            raise RuntimeError(conversion)
+        if "PostScript specials ignored" in conversion:
+            raise RuntimeError("The PGF dvips retry needs Ghostscript. Set LIBGS to its shared library.\n"
+                               + conversion)
+    pages = sorted(work.glob("slide-*.svg"), key=lambda path: int(path.stem.split("-")[1]))
+    if not pages:
+        raise RuntimeError(f"dvisvgm produced no SVG pages\n{conversion}")
+    if re.search(r"(?im)^.*(?:error|warning):", conversion):
+        print(conversion, file=sys.stderr)
+    document = make_html(source, work, pages, args.placement, args.production)
+    output.mkdir(parents=True, exist_ok=True)
+    for name in ("runtime.js", "runtime.css"):
+        shutil.copyfile(ROOT / "runtime" / name, output / name)
+    for ext, asset in (("js", args.js), ("css", args.css)):
+        target = output / f"deck.{ext}"
+        sidecar = asset or source.with_suffix(f".{ext}")
+        if sidecar.is_file() or asset:
+            if sidecar.resolve() != target.resolve():
+                shutil.copyfile(sidecar, target)
+        else:
+            target.write_text("", encoding="utf-8")
+    (output / "index.html").write_text(document, encoding="utf-8")
+    return output
 
 
 def main(argv=None):
@@ -220,7 +208,7 @@ def main(argv=None):
     for action in ("pdf", "build", "serve"):
         command = commands.add_parser(action)
         command.add_argument("source", type=Path)
-        command.add_argument("-o", "--output", type=Path)
+        command.add_argument("-o", "--output", type=Path, help="output path under _build")
         engines = ("pdflatex", "lualatex", "xelatex") if action == "pdf" else ("latex", "dvilualatex", "xelatex")
         command.add_argument("--engine", choices=engines)
         if action != "pdf":
@@ -243,7 +231,7 @@ def main(argv=None):
                 server.serve_forever()
     except KeyboardInterrupt:
         return 130
-    except (OSError, RuntimeError, ValueError, ExpatError) as error:
+    except (OSError, RuntimeError, ValueError, ExpatError, TemplateError) as error:
         print(error, file=sys.stderr)
         return 1
     return 0

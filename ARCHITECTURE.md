@@ -39,4 +39,4 @@ SVG は `preserveAspectRatio="xMidYMid meet"` で表示し、余白を付けて�
 - LaTeX DVI は、TeX Live 2022 最終版の dvisvgm 2.13.3 と、dvisvgm 3.4.4 の両方で検証しています。Beamer 3.72 と PGF の SVG ドライバでは、一部の丸角ブロックで SVG グループの不整合を再現し、DVI の再試行で Madrid の丸角ブロックを変換できることを確認しました。デモは XeLaTeX でも比較できるよう通常のブロックテンプレートを指定しています。明示的な背景透過、PDF 画像や PDF 固有の special は使用する TeX エンジンと dvisvgm で確認してください。
 - build は LaTeX を 2 回実行します。複雑な文献処理などの追加ツール、SVG 埋め込みスタイルに含まれる独自の ID セレクター、他ページを指す Beamer のリンクの変換、watch は今後の拡張です。
 - ソースと sidecar JavaScript は信頼できるものを利用してください。TeX には `-no-shell-escape` を渡し、ウィジェット名は明示的なレジストリで解決します。変換済み SVG と JavaScript を含む出力は作者のコードとして実行されます。
-- `dist/` には core runtime とデモに必要なファイルが含まれます。作者の JavaScript や CSS が追加アセットを参照する場合は、そのファイルも配布してください。
+- `_build/html/` には core runtime とデモに必要なファイルが含まれます。作者の JavaScript や CSS が追加アセットを参照する場合は、そのファイルも配布してください。

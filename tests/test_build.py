@@ -15,8 +15,12 @@ DEMO = Path(__file__).resolve().parents[1] / "examples" / "demo.tex"
 
 
 class BuildTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        Path("_build").mkdir(exist_ok=True)
+
     def test_svg_references_keep_namespaces_and_are_local_to_page(self):
-        with TemporaryDirectory() as temp:
+        with TemporaryDirectory(dir=Path("_build").resolve()) as temp:
             path = Path(temp) / "slide.svg"
             path.write_text(
                 '<svg xmlns="http://www.w3.org/2000/svg" '
@@ -33,8 +37,26 @@ class BuildTests(unittest.TestCase):
             self.assertEqual(group.getAttribute("data-web-id"), "formula")
             self.assertEqual(result.documentElement.getAttribute("viewBox"), "-72 -72 96 54")
 
+    def test_project_template_and_default_build_paths(self):
+        with TemporaryDirectory(dir=Path("_build").resolve()) as temp:
+            project = Path(temp)
+            templates = project / "_templates"
+            templates.mkdir()
+            (templates / "index.html.j2").write_text(
+                '<title>{{ title }}</title>{{ slides[0] | safe }}', encoding="utf-8"
+            )
+            with patch.object(Path, "cwd", return_value=project):
+                self.assertEqual(main(["build", str(DEMO)]), 0)
+                self.assertEqual(main(["pdf", str(DEMO)]), 0)
+            build_dir = project / "_build"
+            html = (build_dir / "html" / "index.html").read_text()
+            self.assertTrue(html.startswith("<title>demo</title><svg"))
+            self.assertTrue((build_dir / "pdf" / "demo.pdf").is_file())
+            self.assertEqual(len(list((build_dir / "intermediate").rglob("slide-*.svg"))), 4)
+            self.assertEqual(len(list((build_dir / "intermediate").rglob("deck.dvi"))), 1)
+
     def test_demo_web_and_pdf(self):
-        with TemporaryDirectory() as temp:
+        with TemporaryDirectory(dir=Path("_build").resolve()) as temp:
             root = Path(temp)
             dist = root / "web"
             self.assertEqual(main(["build", str(DEMO), "-o", str(dist)]), 0)
@@ -59,7 +81,7 @@ class BuildTests(unittest.TestCase):
                 self.assertIn("Canvas motion demo (web edition).", text)
 
     def test_rounded_madrid_blocks(self):
-        with TemporaryDirectory() as temp:
+        with TemporaryDirectory(dir=Path("_build").resolve()) as temp:
             root = Path(temp)
             source = root / "rounded.tex"
             source.write_text(r"""
@@ -78,7 +100,7 @@ class BuildTests(unittest.TestCase):
             self.assertIn('data-web-id="marker"', (dist / "index.html").read_text())
 
     def test_plain_beamer_does_not_require_package_directive(self):
-        with TemporaryDirectory() as temp:
+        with TemporaryDirectory(dir=Path("_build").resolve()) as temp:
             root = Path(temp)
             source = root / "my slides.tex"
             source.write_text(r"""

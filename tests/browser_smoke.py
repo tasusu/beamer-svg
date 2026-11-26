@@ -164,7 +164,9 @@ def main():
     parser.add_argument("--driver", default=os.environ.get("GECKODRIVER"))
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
-    with TemporaryDirectory() as temp:
+    build_dir = root / "_build"
+    build_dir.mkdir(exist_ok=True)
+    with TemporaryDirectory(dir=build_dir) as temp:
         for placement in ("overlay", "foreign-object"):
             dist = Path(temp) / placement
             subprocess.run([sys.executable, "-m", "beamerweb", "build",
