@@ -1,10 +1,17 @@
 \documentclass[aspectratio=169]{beamer}
 \usetheme{Madrid}
+% Use box templates compatible with both the PDF and SVG drivers.
+\setbeamertemplate{title page}[default]
 \setbeamertemplate{blocks}[default]
 \usepackage{tikz}
 \usepackage{beamerweb}
+\title{Beamer SVG Demo}
+\author{Tasuku Soma}
+\date{\today}
 
 \begin{document}
+\maketitle
+
 \begin{frame}{HTML slider}
   \begin{block}{A Beamer block}
     \webid{formula}{$\displaystyle f(\lambda)=1-e^{-\lambda}$}

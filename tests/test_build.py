@@ -52,7 +52,7 @@ class BuildTests(unittest.TestCase):
             html = (build_dir / "html" / "index.html").read_text()
             self.assertTrue(html.startswith("<title>demo</title><svg"))
             self.assertTrue((build_dir / "pdf" / "demo.pdf").is_file())
-            self.assertEqual(len(list((build_dir / "intermediate").rglob("slide-*.svg"))), 4)
+            self.assertEqual(len(list((build_dir / "intermediate").rglob("slide-*.svg"))), 5)
             self.assertEqual(len(list((build_dir / "intermediate").rglob("deck.dvi"))), 1)
 
     def test_demo_web_and_pdf(self):
@@ -61,15 +61,18 @@ class BuildTests(unittest.TestCase):
             dist = root / "web"
             self.assertEqual(main(["build", str(DEMO), "-o", str(dist)]), 0)
             html = (dist / "index.html").read_text()
-            self.assertEqual(html.count("<svg "), 4)
+            self.assertEqual(html.count("<svg "), 5)
             self.assertNotIn("<img", html)
+            title_svg = html.split("</svg>", 1)[0]
+            self.assertIn("<use ", title_svg)
+            self.assertNotIn("data-web-widget=", title_svg)
             self.assertIn('data-web-id="vertex-v"', html)
             self.assertNotIn("Static value:", html)
             payload = re.search(r'<script id="bw-metadata"[^>]+>(.*?)</script>', html)[1]
             pages = json.loads(payload)
             self.assertEqual([(page["frame"], page["overlay"]) for page in pages],
-                             [(1, 1), (1, 2), (2, 1), (3, 1)])
-            self.assertEqual(pages[2]["frameTitle"], "TikZ network")
+                             [(1, 1), (2, 1), (2, 2), (3, 1), (4, 1)])
+            self.assertEqual(pages[3]["frameTitle"], "TikZ network")
             self.assertEqual((dist / "deck.js").read_bytes(), DEMO.with_suffix(".js").read_bytes())
 
             pdf = root / "demo.pdf"
@@ -77,6 +80,7 @@ class BuildTests(unittest.TestCase):
             self.assertTrue(pdf.read_bytes().startswith(b"%PDF-"))
             if shutil.which("pdftotext"):
                 text = subprocess.check_output(["pdftotext", str(pdf), "-"], text=True)
+                self.assertIn("Beamer SVG Demo", text.split("\f", 1)[0])
                 self.assertIn("Static value: λ = 0.43", text)
                 self.assertIn("Canvas motion demo (web edition).", text)
 

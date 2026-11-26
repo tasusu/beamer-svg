@@ -88,6 +88,8 @@ def wait_for(evaluate, script, seconds=4):
 def check(operations, url):
     open_url, evaluate, click, resize = operations
     open_url(url)
+    wait_for(evaluate, "return document.querySelector('#bw-counter').value === '1 / 5';")
+    click("#bw-next")
     wait_for(evaluate, ALIGNMENT)
     evaluate("""
       window.key = (target, key) => target.dispatchEvent(new KeyboardEvent('keydown', {
@@ -99,7 +101,7 @@ def check(operations, url):
       input.dispatchEvent(new Event('input', {bubbles: true}));
       window.key(input, 'ArrowRight');
     """)
-    assert evaluate("return document.querySelector('#bw-counter').value === '1 / 4';")
+    assert evaluate("return document.querySelector('#bw-counter').value === '2 / 5';")
     assert evaluate("return +document.querySelector('[data-web-id=formula]').style.opacity > .75;")
     evaluate("""
       const text = document.createElement('input');
@@ -108,7 +110,7 @@ def check(operations, url):
       text.value = 'slide notes';
       key(text, ' ');
     """)
-    assert evaluate("return document.activeElement.value === 'slide notes' && !location.hash;")
+    assert evaluate("return document.activeElement.value === 'slide notes' && location.hash === '#/2';")
     resize()
     wait_for(evaluate, ALIGNMENT)
     click("#bw-fullscreen")
@@ -117,16 +119,16 @@ def check(operations, url):
     click("#bw-fullscreen")
     wait_for(evaluate, "return !document.fullscreenElement;")
     evaluate("""
-      const marker = document.querySelector('.bw-slide:nth-child(2) [data-web-widget]');
+      const marker = document.querySelector('.bw-slide:nth-child(3) [data-web-widget]');
       marker.setAttribute('transform', 'rotate(8 ' + marker.getAttribute('x') + ' ' +
         marker.getAttribute('y') + ')');
       window.key(document.body, 'ArrowRight');
     """)
-    wait_for(evaluate, "return location.hash === '#/2' && document.querySelector('input').value === '0.75';")
+    wait_for(evaluate, "return location.hash === '#/3' && document.querySelector('input').value === '0.75';")
     wait_for(evaluate, ALIGNMENT)
     evaluate("window.key(document.body, 'PageUp');")
-    wait_for(evaluate, "return location.hash === '#/1';")
-    open_url(url + "#/3")
+    wait_for(evaluate, "return location.hash === '#/2';")
+    open_url(url + "#/4")
     wait_for(evaluate, ALIGNMENT)
     click('[data-web-id="vertex-v"]')
     assert evaluate("""
@@ -134,7 +136,7 @@ def check(operations, url):
         document.querySelector('.bw-widget').textContent.includes('vertex: v');
     """)
     click("#bw-next")
-    wait_for(evaluate, "return location.hash === '#/4';")
+    wait_for(evaluate, "return location.hash === '#/5';")
     wait_for(evaluate, ALIGNMENT)
     evaluate("""
       const canvas = document.querySelector('canvas');
