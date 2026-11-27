@@ -1,9 +1,148 @@
 \documentclass[aspectratio=169]{beamer}
-\usetheme{Madrid}
-% Use box templates compatible with both the PDF and SVG drivers.
-\setbeamertemplate{title page}[default]
-\setbeamertemplate{blocks}[default]
+\usetheme{Boadilla}
+%Beamerフォント設定
+\usefonttheme{professionalfonts}
+\usepackage[T1]{fontenc}
+\usepackage{mlmodern}  % 太いComputer Modern
+% MLmodernのバグを修正: cf. https://tex.stackexchange.com/questions/646333/size-of-integral-symbol-in-section-header-with-mlmodern
+\DeclareFontFamily{OMX}{mlmex}{}
+\DeclareFontShape{OMX}{mlmex}{m}{n}{%
+   <->mlmex10%
+   }{}
+\usepackage{newtxtext} % 数式以外をTXフォントで上書き
+\renewcommand{\familydefault}{\sfdefault}  % 英文をサンセリフ体に
+\usefonttheme{structurebold} % タイトル部を太字
+\setbeamerfont{alerted text}{series=\bfseries} % Alertを太字
+\setbeamerfont{section in toc}{series=\mdseries} % 目次は太字にしない
+\setbeamerfont{frametitle}{size=\Large} % フレームタイトル文字サイズ
+\setbeamerfont{title}{size=\LARGE} % タイトル文字サイズ
+\setbeamerfont{date}{size=\small}  % 日付文字サイズ
+
+%Beamer色設定
+\definecolor{UniBlue}{RGB}{0,150,200}
+\definecolor{UniGreen}{RGB}{3,175,122}
+\definecolor{UniPink}{RGB}{255,128,255}
+\definecolor{AlertOrange}{RGB}{255,76,0}
+\definecolor{AlmostBlack}{RGB}{38,38,38}
+\setbeamercolor{normal text}{fg=AlmostBlack}  % 本文カラー
+\setbeamercolor{structure}{fg=UniBlue} % 見出しカラー
+\setbeamercolor{block title}{fg=UniBlue!50!black} % ブロック部分タイトルカラー
+\setbeamercolor{alerted text}{fg=AlertOrange} % \alert 文字カラー
+\setbeamercolor{bibliography entry author}{fg=AlmostBlack} % Bib 文字カラー
+\setbeamercolor{bibliography entry note}{fg=AlmostBlack} % Bib 文字カラー
+\mode<beamer>{
+    \definecolor{BackGroundGray}{RGB}{254,254,254}
+    \setbeamercolor{background canvas}{bg=BackGroundGray} % スライドモードのみ背景をわずかにグレーにする
+}
+
+%フラットデザイン化
+\setbeamertemplate{blocks}[default] % タイトルと本文を単色の背景でつなぐ
+\useinnertheme{circles} % 箇条書きをシンプルに
+\setbeamertemplate{navigation symbols}{} % ナビゲーションシンボルを消す
+\setbeamertemplate{footline}[frame number] % フッターはスライド番号のみ
+
+%タイトルページ
+\setbeamertemplate{title page}{%
+    \vspace{2.5em}
+    {\usebeamerfont{title} \usebeamercolor[fg]{title} \inserttitle \par}
+    {\usebeamerfont{subtitle}\usebeamercolor[fg]{subtitle}\insertsubtitle \par}
+
+    \vspace{1.5em}
+    \begin{columns}[]
+        \begin{column}{.35\linewidth}
+        \usebeamerfont{titlegraphic}\inserttitlegraphic\par
+        \end{column}
+        \begin{column}{.6\linewidth}\setlength\topsep{0pt}
+            \begin{flushright}
+        \usebeamerfont{author}\insertauthor\par
+        \usebeamerfont{institute}\insertinstitute \par
+        \vspace{3em}
+        \usebeamerfont{date}\insertdate\par
+            \end{flushright}
+        \end{column}
+    \end{columns}
+}
+
+
+% Algorithm系
+\usepackage{algorithm}
+\usepackage[noend]{algorithmic}
+\algsetup{linenosize=\color{fg!50}\footnotesize}
+\renewcommand\algorithmicdo{:}
+\renewcommand\algorithmicthen{:}
+\renewcommand\algorithmicelse{\textbf{else}:}
+\renewcommand\algorithmicrequire{\textbf{Input:}}
+\renewcommand\algorithmicensure{\textbf{Output:}}
+\renewcommand\algorithmiccomment[1]{\hfill\textcolor{fg!50}{\footnotesize\textit{// #1}}}
+
+% TikZ
 \usepackage{tikz}
+\usetikzlibrary{positioning,shapes,arrows,quotes,shapes.callouts,calc,graphs,graphs.standard,fit,backgrounds,perspective,matrix,decorations.pathmorphing,decorations.pathreplacing,decorations.shapes}
+\tikzset{point/.style={circle, fill, inner sep=1pt, text width=1pt}}
+\tikzset{alt/.code args={<#1>#2#3}{\alt<#1>{\pgfkeysalso{#2}}{\pgfkeysalso{#3}}}}
+\tikzset{>=latex}
+\tikzset{mynodes/.style={circle,white,fill=UniBlue!90,text width=.8em,inner sep=0pt,text centered,font=\footnotesize}}
+\tikzset{myedges/.style={thick}}
+\tikzset{mypath/.style={ultra thick, draw=#1}, mypath/.default=AlertOrange}
+\tikzset{mysubset/.style={draw,#1,dotted,thick,fill=#1!10}, mysubset/.default=UniBlue}
+\tikzset{mypath2/.style={ultra thick, dashed, draw=UniGreen}}
+\tikzset{graphs/mygraph/.style={nodes={mynodes}, edges={myedges}, empty nodes}}
+\tikzset{nomargin/.style={inner sep=0pt, outer sep=0pt}}
+%% graph macros
+\tikzgraphsset{declare={mybipartite}{%
+subgraph I_nm [V={1,2,3,4,5,6}, W={a,b,c,d,e,f}];
+1 -- {a,b};
+2 -- {b,c,d,e};
+3 -- {d,f};
+4 -- {e,f};
+{5,6} -- f;
+}}
+\tikzgraphsset{declare={mybipartitedi}{%
+subgraph I_nm [V={1,2,3,4,5,6}, W={a,b,c,d,e,f}];
+1 -> {a,b};
+2 -> {b,c,d,e};
+3 -> {d,f};
+4 -> {e,f};
+{5,6} -> f;
+}}
+\tikzgraphsset{declare={mybipartite2}{%
+subgraph I_nm [V={1,2,3}, W={a,b,c}];
+1 -- {a,b}; 2 -- {a,b,c}; 3 -- {a,c};
+}} 
+% Petersen graph
+\tikzgraphsset{declare={Petersen}{%
+    subgraph C_n [n=5,name=A, radius=1.5cm]; 
+    subgraph I_n [n=5,name=B, radius=.8cm];
+    \foreach \i [evaluate={\j=int(mod(\i+2,5)+1);}] in {1,...,5}{
+        A \i -- B \i;
+        B \i -- B \j;
+}}}
+% Example graph for Menger's theorem
+\tikzgraphsset{declare={menger}{%
+    s[at={(-1,0)}, as={$s$}];
+    (s) -> 1[at={(0,1)}] -> 2[at={(1,0)}];
+    (s) -> 3[at={(0,-1)}] -> 2;
+    4[at={(2,1)}] <- 5[at={(2,-1)}];
+    {5,6[at={(3,1)}], 7[at={(3,-1)}]} -> t[at={(4,0)}, as={$t$}];
+    (s) -> (2);
+    (2) -> {(4), (5)};
+    {(4),(5)} -> {(6),(7)};
+    (6) -> (7);
+    1 -> 4;
+}} 
+\tikzgraphsset{declare={undirected menger}{%
+    s[at={(-1,0)}, as={$s$}];
+    (s) -- 1[at={(0,1)}] -- 2[at={(1,0)}];
+    (s) -- 3[at={(0,-1)}] -- 2;
+    4[at={(2,1)}] -- 5[at={(2,-1)}];
+    {5,6[at={(3,1)}], 7[at={(3,-1)}]} -- t[at={(4,0)}, as={$t$}];
+    (s) -- (2);
+    (2) -- {(4), (5)};
+    {(4),(5)} -- {(6),(7)};
+    (6) -- (7);
+    1 -- 4;
+}} 
+
 \usepackage{beamerweb}
 \title{Beamer SVG Demo}
 \author{Tasuku Soma}
@@ -26,14 +165,14 @@
   \centering
   \begin{webinteractive}{flow-graph}
     \begin{tikzpicture}[x=1.7cm,y=1.3cm,thick]
-      \begin{scope}[web id=edge-sv] \draw[->] (.22,0.10) -- (1.78,.90); \end{scope}
-      \begin{scope}[web id=edge-sw] \draw[->] (.22,-.10) -- (1.78,-.90); \end{scope}
-      \begin{scope}[web id=edge-vt] \draw[->] (2.22,.90) -- (3.78,.10); \end{scope}
-      \begin{scope}[web id=edge-wt] \draw[->] (2.22,-.90) -- (3.78,-.10); \end{scope}
-      \begin{scope}[web id=vertex-s] \node[draw,circle,fill=blue!12] at (0,0) {$s$}; \end{scope}
-      \begin{scope}[web id=vertex-v] \node[draw,circle,fill=blue!12] at (2,1) {$v$}; \end{scope}
-      \begin{scope}[web id=vertex-w] \node[draw,circle,fill=blue!12] at (2,-1) {$w$}; \end{scope}
-      \begin{scope}[web id=vertex-t] \node[draw,circle,fill=blue!12] at (4,0) {$t$}; \end{scope}
+      \begin{scope}[web id=vertex-s] \node[mynodes](s) at (0,0) {$s$}; \end{scope}
+      \begin{scope}[web id=vertex-v] \node[mynodes](v) at (2,1) {$v$}; \end{scope}
+      \begin{scope}[web id=vertex-w] \node[mynodes](w) at (2,-1) {$w$}; \end{scope}
+      \begin{scope}[web id=vertex-t] \node[mynodes](t) at (4,0) {$t$}; \end{scope}
+      \begin{scope}[web id=edge-sv] \draw[myedges,->] (s) -- (v); \end{scope}
+      \begin{scope}[web id=edge-sw] \draw[myedges,->] (s) -- (w); \end{scope}
+      \begin{scope}[web id=edge-vt] \draw[myedges,->] (v) -- (t); \end{scope}
+      \begin{scope}[web id=edge-wt] \draw[myedges,->] (w) -- (t); \end{scope}
     \end{tikzpicture}
   \end{webinteractive}
 
@@ -43,5 +182,54 @@
 \begin{frame}{Canvas animation}
   \centering
   \webwidget[width=9cm,height=3.2cm,fallback={Canvas motion demo (web edition).}]{canvas-demo}
+\end{frame}
+
+\section{frames}
+\begin{frame}{block samples}
+    \begin{block}{block sample}
+        Sample of block environment\\
+        \alert{alerted text}
+    \end{block} 
+    \vfill
+    \begin{exampleblock}{example block sample}
+        Sample of example block environment
+    \end{exampleblock} 
+    \vfill
+    \begin{alertblock}{alert block sample}
+        Sample of alert block environment
+    \end{alertblock} 
+\end{frame}
+
+\begin{frame}{math samples}
+    \[
+       \frac{1}{2\pi} \int_0^\infty f(x)e^{i\omega x} dx, \quad
+       \sum_{i=1}^\infty \frac{1}{i^2} = \frac{\pi^2}{6}
+    \]
+
+    \begin{itemize}
+        \item text and math \\ 
+         $\alpha$-approximation algorithm, submodular function $f$, $\sum_{i=1}^n i$
+        \item Blackboard bold $\mathbb{Q}$, $\mathbb{R}$, $\mathbb{C}$
+        \item Bold $\mathbf{a}, \mathbf{b}, \mathbf{c}$
+        \item Italic bold $\boldsymbol{a}, \boldsymbol{b}, \boldsymbol{c}$
+        \item Calligraphic $\mathcal{A}$, $\mathcal{B}$, $\mathcal{C}$
+        \item Operators $\max A$, $\min B$, $\sup X$, $\inf Y$
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Algorithms}
+    \begin{block}{Matrix Multiplication}
+        \begin{algorithmic}[1]
+            \STATE $C = O$
+            \FOR{$i = 1, \dots, m$}
+            \FOR{$j = 1, \dots, n$}
+            \FOR{$k = 1, \dots, r$}
+            \STATE $C[i,j] = C[i,j] + A[i, k] \cdot B[k, j]$
+            \ENDFOR
+            \ENDFOR
+            \ENDFOR
+            \RETURN $C$
+        \end{algorithmic}
+    \end{block}
 \end{frame}
 \end{document}

@@ -1,6 +1,7 @@
 """Build a PDF or a local, self-contained directory of SVG slide assets."""
 
 import argparse
+from ctypes.util import find_library
 from functools import partial
 from hashlib import sha256
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -174,6 +175,11 @@ def build(args):
         print("Retrying with the PGF dvips driver after an unclosed SVG group.", file=sys.stderr)
         for page in work.glob("slide-*.svg"):
             page.unlink()
+        # Some dvisvgm releases look for libgs.so without a version suffix.
+        if "LIBGS" not in env:
+            ghostscript = find_library("gs")
+            if ghostscript:
+                env["LIBGS"] = ghostscript
         compile_tex(source, work, engine, web=True, pgf_driver="dvips")
         conversion = run(conversion_command, source.parent, env)
         if UNCLOSED_GROUP in conversion:

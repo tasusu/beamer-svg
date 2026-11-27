@@ -4,16 +4,22 @@ Beamer が組版した全ページを dvisvgm で SVG に変換し、各ペー�
 
 ## セットアップとデモ
 
-Python 3.10 以上、TeX Live 2022 最終版以降の LaTeX・Beamer・PGF/TikZ、dvisvgm 2.13.3 以降が必要です。Debian 系では以下のパッケージが揃えばデモをビルドできます。
+Python 3.10 以上、TeX Live 2022 最終版以降の LaTeX・Beamer・PGF/TikZ、dvisvgm 2.13.3 以降が必要です。Aqua ベースのデモには MLModern、NewTX、Algorithms も必要です。Debian 系では次のパッケージに含まれます。
 
 ```sh
-sudo apt-get install texlive-latex-recommended texlive-pictures texlive-fonts-recommended dvisvgm ghostscript
+sudo apt-get install texlive-latex-recommended texlive-pictures texlive-fonts-recommended texlive-fonts-extra texlive-latex-extra texlive-science dvisvgm ghostscript
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e .
 beamerweb build examples/demo.tex
 beamerweb pdf examples/demo.tex
 beamerweb serve examples/demo.tex
+```
+
+TeX Live を `tlmgr` で管理している場合は、標準の Beamer・PGF/TikZ に加えてデモ用のパッケージをインストールします。
+
+```sh
+tlmgr install mlmodern newtx algorithms float xkeyval xstring carlisle mweights fontaxes tex-gyre txfonts
 ```
 
 `_build/html/index.html` をブラウザで開けます。デモはスライダーで数式の透明度を変え、TikZ の頂点クリックで辺を強調し、Canvas アニメーションを再生・停止します。`_build/pdf/demo.pdf` には各ウィジェットの静的な表示が入ります。
@@ -24,7 +30,7 @@ beamerweb serve examples/demo.tex
 beamerweb build examples/demo.tex --dvisvgm /path/to/texlive/bin/dvisvgm
 ```
 
-dvisvgm が Ghostscript を見つけられない場合は、`LIBGS` に Ghostscript の共有ライブラリのパスを設定してください。たとえば Debian の x86-64 環境では `export LIBGS=/usr/lib/x86_64-linux-gnu/libgs.so.10` です。
+丸角ブロックの変換で PGF の dvips ドライバに切り替える場合は Ghostscript を使います。自動検出できない場合は、`LIBGS` に Ghostscript の共有ライブラリのパスを設定してください。たとえば Debian の x86-64 環境では `export LIBGS=/usr/lib/x86_64-linux-gnu/libgs.so.10` です。
 
 | 操作 | キー |
 | --- | --- |
